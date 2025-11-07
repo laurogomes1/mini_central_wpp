@@ -21,7 +21,7 @@
 			"name": "Extrai",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [-656, 112]
+			"position": [-656, 112],
 		},
 		{
 			"parameters": {
@@ -30,7 +30,7 @@
 			"name": "DEBUG - Ver Dados",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [-520, 0]
+			"position": [-520, 0],
 		},
 		{
 			"parameters": {
@@ -46,7 +46,7 @@
 			"name": "IF onmessage",
 			"type": "n8n-nodes-base.if",
 			"typeVersion": 1,
-			"position": [-448, 112]
+			"position": [-448, 112],
 		},
 		{
 			"parameters": {
@@ -61,7 +61,7 @@
 			"name": "IF Comando Citar",
 			"type": "n8n-nodes-base.if",
 			"typeVersion": 1,
-			"position": [-336, 112]
+			"position": [-336, 112],
 		},
 		{
 			"parameters": {
@@ -70,7 +70,7 @@
 			"name": "Processa Citar",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [-160, 0]
+			"position": [-160, 0],
 		},
 		{
 			"parameters": {
@@ -85,16 +85,16 @@
 			"name": "IF Cliente",
 			"type": "n8n-nodes-base.if",
 			"typeVersion": 1,
-			"position": [-224, 112]
+			"position": [-224, 112],
 		},
 		{
 			"parameters": {
-				"functionCode": "const data = $node[\"Extrai\"].json;\nconst clientPhone = data.from.split('@')[0];\nconst originalMessageId = data.messageId || data.id || null;\n\nconsole.log('=== FORMATA GRUPO ===');\nconsole.log('Cliente:', clientPhone);\nconsole.log('ID da mensagem original:', originalMessageId);\n\nconst payload = {\n  phone: \"YOUR_GROUP_ID@g.us\", // CONFIGURAR: ID do grupo WhatsApp para onde as mensagens dos clientes serão enviadas\n  isGroup: true\n};\n\nlet endpoint = 'send-message';\n\n// Cria um identificador oculto que contém o ID da mensagem original\n// Usamos um caractere invisível (Zero Width Space) para ocultar\nconst hiddenId = originalMessageId ? `\\u200B[ID:${originalMessageId}]\\u200B` : '';\n\n// Formata o número de telefone no padrão brasileiro\nconst formatPhone = (phone) => {\n  if (phone.length === 13 && phone.startsWith('55')) {\n    const ddd = phone.substr(2, 2);\n    const num1 = phone.substr(4, 5);\n    const num2 = phone.substr(9, 4);\n    return `+55 ${ddd} ${num1}-${num2}`;\n  }\n  return phone;\n};\n\n// Pega data e hora atual\nconst now = new Date();\nconst horario = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });\nconst dataCompleta = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });\n\n// Detecta tipo de mensagem\nconst getTipoMensagem = () => {\n  if (data.type === 'ptt' || data.mimetype?.startsWith('audio')) return 'Áudio';\n  if (data.type === 'sticker' || data.type === 'sticker-animated') return 'Figurinha';\n  if (data.mimetype?.startsWith('image')) return 'Imagem';\n  if (data.mimetype?.startsWith('video')) return 'Vídeo';\n  if (data.mimetype?.includes('pdf') || data.type === 'document') return 'Documento';\n  return 'Texto';\n};\n\n// Fluxo normal (sem comando /citar ou /citar sem cliente identificado)\nif (data.isMedia) {\n  const tipoMsg = getTipoMensagem();\n  let caption = `${hiddenId}━━━━━━━━━━━━━━━━━━━━━━━\\n📱 Cliente: ${formatPhone(clientPhone)}\\n🕐 Horário: ${horario}\\n📅 Data: ${dataCompleta}\\n💬 Tipo: ${tipoMsg}\\n━━━━━━━━━━━━━━━━━━━━━━━`;\n  \n  if (data.caption) {\n    caption += `\\n\\n${data.caption}`;\n  }\n  \n  const base64Clean = data.body;\n  \n  // ÁUDIO: marca para envio duplo\n  if (data.type === 'ptt' || data.mimetype?.startsWith('audio')) {\n    endpoint = 'send-voice-base64';\n    payload.base64Ptt = base64Clean;\n    payload._audioMode = true;\n    payload._textMessage = `${hiddenId}━━━━━━━━━━━━━━━━━━━━━━━\\n📱 Cliente: ${formatPhone(clientPhone)}\\n🕐 Horário: ${horario}\\n📅 Data: ${dataCompleta}\\n💬 Tipo: Áudio\\n━━━━━━━━━━━━━━━━━━━━━━━`;\n    payload._phone = payload.phone;\n  }\n  // FIGURINHA: marca para envio duplo\n  else if (data.type === 'sticker' || data.type === 'sticker-animated' || data.mimetype?.includes('webp')) {\n    // Usa endpoint diferente para figurinhas animadas\n    endpoint = data.type === 'sticker-animated' ? 'send-sticker-gif' : 'send-sticker';\n    // WPPConnect aceita path como base64 também\n    payload.path = `data:${data.mimetype || 'image/webp'};base64,${base64Clean}`;\n    payload._stickerMode = true;\n    payload._textMessage = `${hiddenId}━━━━━━━━━━━━━━━━━━━━━━━\\n📱 Cliente: ${formatPhone(clientPhone)}\\n🕐 Horário: ${horario}\\n📅 Data: ${dataCompleta}\\n💬 Tipo: Figurinha\\n━━━━━━━━━━━━━━━━━━━━━━━`;\n    payload._phone = payload.phone;\n  }\n  // IMAGEM (exceto WebP que já foi tratado como sticker)\n  else if (data.mimetype?.startsWith('image') && !data.mimetype?.includes('webp')) {\n    endpoint = 'send-image';\n    payload.base64 = `data:${data.mimetype};base64,${base64Clean}`;\n    payload.filename = data.mimetype.includes('png') ? 'image.png' : 'image.jpg';\n    payload.caption = caption;\n  }\n  // VÍDEO: similar ao fluxo de imagens\n  else if (data.mimetype?.startsWith('video')) {\n    endpoint = 'send-file-base64';\n    payload.base64 = `data:${data.mimetype};base64,${base64Clean}`;\n    payload.filename = 'video.mp4';\n    payload.caption = caption;\n    payload._videoMode = true;\n    payload._textMessage = `${hiddenId}━━━━━━━━━━━━━━━━━━━━━━━\\n📱 Cliente: ${formatPhone(clientPhone)}\\n🕐 Horário: ${horario}\\n📅 Data: ${dataCompleta}\\n💬 Tipo: Vídeo\\n━━━━━━━━━━━━━━━━━━━━━━━`;\n    payload._phone = payload.phone;\n  }\n  // DOCUMENTO\n  else {\n    endpoint = 'send-file-base64';\n    payload.base64 = base64Clean;\n    payload.filename = data.filename || 'file.pdf';\n    payload.caption = caption;\n  }\n} else {\n  const tipoMsg = getTipoMensagem();\n  payload.message = `${hiddenId}━━━━━━━━━━━━━━━━━━━━━━━\\n📱 Cliente: ${formatPhone(clientPhone)}\\n🕐 Horário: ${horario}\\n📅 Data: ${dataCompleta}\\n💬 Tipo: ${tipoMsg}\\n━━━━━━━━━━━━━━━━━━━━━━━\\n\\n${data.body || ''}`;\n}\n\nconsole.log('Payload formatado para grupo:', JSON.stringify({...payload, base64: '[BASE64]', base64Ptt: '[BASE64]'}, null, 2));\n\nreturn [{ json: { ...payload, _endpoint: endpoint } }];"
+				"functionCode": "const data = $node[\"Extrai\"].json;\nconst clientPhone = data.from.split('@')[0];\nconst originalMessageId = data.messageId || data.id || null;\n\nconsole.log('=== FORMATA GRUPO ===');\nconsole.log('Cliente:', clientPhone);\nconsole.log('ID da mensagem original:', originalMessageId);\n\nconst payload = {\n  phone: \"YOUR_GROUP_ID@g.us\",\n  isGroup: true\n};\n\nlet endpoint = 'send-message';\n\n// Cria um identificador oculto que contém o ID da mensagem original\n// Usamos um caractere invisível (Zero Width Space) para ocultar\nconst hiddenId = originalMessageId ? `\\u200B[ID:${originalMessageId}]\\u200B` : '';\n\n// Formata o número de telefone no padrão brasileiro\nconst formatPhone = (phone) => {\n  if (phone.length === 13 && phone.startsWith('55')) {\n    const ddd = phone.substr(2, 2);\n    const num1 = phone.substr(4, 5);\n    const num2 = phone.substr(9, 4);\n    return `+55 ${ddd} ${num1}-${num2}`;\n  }\n  return phone;\n};\n\n// Pega data e hora atual\nconst now = new Date();\nconst horario = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });\nconst dataCompleta = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });\n\n// Detecta tipo de mensagem\nconst getTipoMensagem = () => {\n  if (data.type === 'ptt' || data.mimetype?.startsWith('audio')) return 'Áudio';\n  if (data.type === 'sticker' || data.type === 'sticker-animated') return 'Figurinha';\n  if (data.mimetype?.startsWith('image')) return 'Imagem';\n  if (data.mimetype?.startsWith('video')) return 'Vídeo';\n  if (data.mimetype?.includes('pdf') || data.type === 'document') return 'Documento';\n  return 'Texto';\n};\n\n// Fluxo normal (sem comando /citar ou /citar sem cliente identificado)\nif (data.isMedia) {\n  const tipoMsg = getTipoMensagem();\n  let caption = `${hiddenId}━━━━━━━━━━━━━━━━━━━━━━━\\n📱 Cliente: ${formatPhone(clientPhone)}\\n🕐 Horário: ${horario}\\n📅 Data: ${dataCompleta}\\n💬 Tipo: ${tipoMsg}\\n━━━━━━━━━━━━━━━━━━━━━━━`;\n  \n  if (data.caption) {\n    caption += `\\n\\n${data.caption}`;\n  }\n  \n  const base64Clean = data.body;\n  \n  // ÁUDIO: marca para envio duplo\n  if (data.type === 'ptt' || data.mimetype?.startsWith('audio')) {\n    endpoint = 'send-voice-base64';\n    payload.base64Ptt = base64Clean;\n    payload._audioMode = true;\n    payload._textMessage = `${hiddenId}━━━━━━━━━━━━━━━━━━━━━━━\\n📱 Cliente: ${formatPhone(clientPhone)}\\n🕐 Horário: ${horario}\\n📅 Data: ${dataCompleta}\\n💬 Tipo: Áudio\\n━━━━━━━━━━━━━━━━━━━━━━━`;\n    payload._phone = payload.phone;\n  }\n  // FIGURINHA: marca para envio duplo\n  else if (data.type === 'sticker' || data.type === 'sticker-animated' || data.mimetype?.includes('webp')) {\n    // Usa endpoint diferente para figurinhas animadas\n    endpoint = data.type === 'sticker-animated' ? 'send-sticker-gif' : 'send-sticker';\n    // WPPConnect aceita path como base64 também\n    payload.path = `data:${data.mimetype || 'image/webp'};base64,${base64Clean}`;\n    payload._stickerMode = true;\n    payload._textMessage = `${hiddenId}━━━━━━━━━━━━━━━━━━━━━━━\\n📱 Cliente: ${formatPhone(clientPhone)}\\n🕐 Horário: ${horario}\\n📅 Data: ${dataCompleta}\\n💬 Tipo: Figurinha\\n━━━━━━━━━━━━━━━━━━━━━━━`;\n    payload._phone = payload.phone;\n  }\n  // IMAGEM (exceto WebP que já foi tratado como sticker)\n  else if (data.mimetype?.startsWith('image') && !data.mimetype?.includes('webp')) {\n    endpoint = 'send-image';\n    payload.base64 = `data:${data.mimetype};base64,${base64Clean}`;\n    payload.filename = data.mimetype.includes('png') ? 'image.png' : 'image.jpg';\n    payload.caption = caption;\n  }\n  // VÍDEO: similar ao fluxo de imagens\n  else if (data.mimetype?.startsWith('video')) {\n    endpoint = 'send-file-base64';\n    payload.base64 = `data:${data.mimetype};base64,${base64Clean}`;\n    payload.filename = 'video.mp4';\n    payload.caption = caption;\n    payload._videoMode = true;\n    payload._textMessage = `${hiddenId}━━━━━━━━━━━━━━━━━━━━━━━\\n📱 Cliente: ${formatPhone(clientPhone)}\\n🕐 Horário: ${horario}\\n📅 Data: ${dataCompleta}\\n💬 Tipo: Vídeo\\n━━━━━━━━━━━━━━━━━━━━━━━`;\n    payload._phone = payload.phone;\n  }\n  // DOCUMENTO\n  else {\n    endpoint = 'send-file-base64';\n    payload.base64 = base64Clean;\n    payload.filename = data.filename || 'file.pdf';\n    payload.caption = caption;\n  }\n} else {\n  const tipoMsg = getTipoMensagem();\n  payload.message = `${hiddenId}━━━━━━━━━━━━━━━━━━━━━━━\\n📱 Cliente: ${formatPhone(clientPhone)}\\n🕐 Horário: ${horario}\\n📅 Data: ${dataCompleta}\\n💬 Tipo: ${tipoMsg}\\n━━━━━━━━━━━━━━━━━━━━━━━\\n\\n${data.body || ''}`;\n}\n\nconsole.log('Payload formatado para grupo:', JSON.stringify({...payload, base64: '[BASE64]', base64Ptt: '[BASE64]'}, null, 2));\n\nreturn [{ json: { ...payload, _endpoint: endpoint } }];"
 			},
 			"name": "Formata Grupo",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [-80, 0]
+			"position": [-80, 0],
 		},
 		{
 			"parameters": {
@@ -103,16 +103,16 @@
 			"name": "Prepara Request",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [30, 0]
+			"position": [30, 0],
 		},
 		{
 			"parameters": {
-				"functionCode": "// Prepara URL dinâmica e corpo da requisição\nconst endpoint = $json._endpoint || 'send-message';\nconst audioMode = $json._audioMode || false;\nconst stickerMode = $json._stickerMode || false;\nconst videoMode = $json._videoMode || false;\nconst textMessage = $json._textMessage || '';\nconst phone = $json._phone;\n\n// Payload limpo (sem flags internas)\nconst payload = { ...$json };\ndelete payload._endpoint;\ndelete payload._audioMode;\ndelete payload._stickerMode;\ndelete payload._videoMode;\ndelete payload._textMessage;\ndelete payload._phone;\n\nreturn [{\n  json: {\n    _url: `YOUR_WPPCONNECT_URL/api/YOUR_SESSION_NAME/${endpoint}`, // CONFIGURAR: URL do servidor WPPConnect e nome da sessão\n    _payload: payload,\n    _audioMode: audioMode,\n    _stickerMode: stickerMode,\n    _videoMode: videoMode,\n    _textMessage: textMessage,\n    _phone: phone\n  }\n}];"
+				"functionCode": "// Prepara URL dinâmica e corpo da requisição\nconst endpoint = $json._endpoint || 'send-message';\nconst audioMode = $json._audioMode || false;\nconst stickerMode = $json._stickerMode || false;\nconst videoMode = $json._videoMode || false;\nconst textMessage = $json._textMessage || '';\nconst phone = $json._phone;\n\n// Payload limpo (sem flags internas)\nconst payload = { ...$json };\ndelete payload._endpoint;\ndelete payload._audioMode;\ndelete payload._stickerMode;\ndelete payload._videoMode;\ndelete payload._textMessage;\ndelete payload._phone;\n\nreturn [{\n  json: {\n    _url: `http://YOUR_WPPCONNECT_URL/api/YOUR_SESSION_NAME/${endpoint}`,\n    _payload: payload,\n    _audioMode: audioMode,\n    _stickerMode: stickerMode,\n    _videoMode: videoMode,\n    _textMessage: textMessage,\n    _phone: phone\n  }\n}];"
 			},
 			"name": "Monta URL",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [120, 0]
+			"position": [120, 0],
 		},
 		{
 			"parameters": {
@@ -124,10 +124,9 @@
 				"headerParametersJson": "{\n  \"Authorization\": \"Bearer YOUR_WPPCONNECT_API_KEY\",\n  \"Content-Type\": \"application/json\"\n}\n"
 			},
 			"name": "HTTP Grupo",
-			"notes": "CONFIGURAÇÃO NECESSÁRIA:\n- Authorization: Insira o Bearer token da API do WPPConnect\n- Obtenha o token nas configurações do servidor WPPConnect",
 			"type": "n8n-nodes-base.httpRequest",
 			"typeVersion": 1,
-			"position": [210, 0]
+			"position": [210, 0],
 		},
 		{
 			"parameters": {
@@ -136,7 +135,7 @@
 			"name": "DEBUG Media Check",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [310, 0]
+			"position": [310, 0],
 		},
 		{
 			"parameters": {
@@ -152,22 +151,21 @@
 			"name": "IF Audio/Sticker/Video",
 			"type": "n8n-nodes-base.if",
 			"typeVersion": 1,
-			"position": [410, 0]
+			"position": [410, 0],
 		},
 		{
 			"parameters": {
 				"requestMethod": "POST",
-				"url": "YOUR_WPPCONNECT_URL/api/YOUR_SESSION_NAME/send-message",
+				"url": "http://YOUR_WPPCONNECT_URL/api/YOUR_SESSION_NAME/send-message",
 				"jsonParameters": true,
 				"options": {},
 				"bodyParametersJson": "={{JSON.stringify({\n  phone: $json.phone,\n  isGroup: true,\n  message: $json.textMessage\n})}}",
 				"headerParametersJson": "{\n  \"Authorization\": \"Bearer YOUR_WPPCONNECT_API_KEY\",\n  \"Content-Type\": \"application/json\"\n}\n"
 			},
 			"name": "Envia Identificação",
-			"notes": "CONFIGURAÇÃO NECESSÁRIA:\n- url: Configure a URL do servidor WPPConnect e nome da sessão\n- Authorization: Insira o Bearer token da API do WPPConnect",
 			"type": "n8n-nodes-base.httpRequest",
 			"typeVersion": 1,
-			"position": [580, -80]
+			"position": [580, -80],
 		},
 		{
 			"parameters": {
@@ -176,7 +174,7 @@
 			"name": "Extrai Cliente",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [-80, 208]
+			"position": [-80, 208],
 		},
 		{
 			"parameters": {
@@ -185,16 +183,16 @@
 			"name": "Formata Cliente",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [144, 208]
+			"position": [144, 208],
 		},
 		{
 			"parameters": {
-				"functionCode": "// Prepara URL e payload para HTTP Cliente\nconst endpoint = $json._endpoint || 'send-message';\nconst payload = { ...$json };\ndelete payload._endpoint;\n\nreturn [{\n  json: {\n    _url: `YOUR_WPPCONNECT_URL/api/YOUR_SESSION_NAME/${endpoint}`, // CONFIGURAR: URL do servidor WPPConnect e nome da sessão\n    _payload: JSON.stringify(payload)\n  }\n}];"
+				"functionCode": "// Prepara URL e payload para HTTP Cliente\nconst endpoint = $json._endpoint || 'send-message';\nconst payload = { ...$json };\ndelete payload._endpoint;\n\nreturn [{\n  json: {\n    _url: `http://YOUR_WPPCONNECT_URL/api/YOUR_SESSION_NAME/${endpoint}`,\n    _payload: JSON.stringify(payload)\n  }\n}];"
 			},
 			"name": "Prepara HTTP Cliente",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [256, 208]
+			"position": [256, 208],
 		},
 		{
 			"parameters": {
@@ -206,10 +204,9 @@
 				"headerParametersJson": "{\n  \"Authorization\": \"Bearer YOUR_WPPCONNECT_API_KEY\",\n  \"Content-Type\": \"application/json\"\n}\n"
 			},
 			"name": "HTTP Cliente",
-			"notes": "CONFIGURAÇÃO NECESSÁRIA:\n- Authorization: Insira o Bearer token da API do WPPConnect\n- Obtenha o token nas configurações do servidor WPPConnect",
 			"type": "n8n-nodes-base.httpRequest",
 			"typeVersion": 1,
-			"position": [480, 208]
+			"position": [480, 208],
 		},
 		{
 			"parameters": {
@@ -220,7 +217,7 @@
 			"name": "Response",
 			"type": "n8n-nodes-base.respondToWebhook",
 			"typeVersion": 1,
-			"position": [448, 112]
+			"position": [448, 112],
 		}
 	],
 	"pinData": {},
@@ -432,6 +429,7 @@
 	"settings": {
 		"executionOrder": "v1"
 	},
-	"meta": {},
+	"meta": {
+	},
 	"tags": []
 }
