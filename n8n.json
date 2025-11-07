@@ -1,0 +1,437 @@
+{
+	"name": "Whatsapp Completo - Texto, Mídia, Stickers e Emojis",
+	"nodes": [
+		{
+			"parameters": {
+				"httpMethod": "POST",
+				"path": "YOUR_WEBHOOK_PATH",
+				"responseMode": "responseNode",
+				"options": {}
+			},
+			"name": "Webhook",
+			"type": "n8n-nodes-base.webhook",
+			"typeVersion": 1,
+			"position": [-880, 112],
+			"notes": "CONFIGURAÇÃO NECESSÁRIA:\n- path: Defina um caminho único para o webhook (ex: wpp-automation)\n- Este webhook receberá as mensagens do WhatsApp"
+		},
+		{
+			"parameters": {
+				"functionCode": "const data = items[0].json.body || items[0].json;\n\n// Detecta se é mídia baseado no conteúdo do body\nlet isMediaDetected = data.isMedia || false;\nlet mimetypeDetected = data.mimetype || null;\nlet typeDetected = data.type || 'chat';\n\n// Detecta figurinha (sticker) - pode vir com type='sticker' ou isMedia=true com mimetype de imagem WebP\nif (data.type === 'sticker' || (data.isMedia && data.mimetype && data.mimetype.includes('webp'))) {\n  isMediaDetected = true;\n  mimetypeDetected = data.mimetype || 'image/webp';\n  typeDetected = 'sticker';\n}\n\n// Se body for muito grande e começar com padrões de base64 de mídia\nif (data.body && typeof data.body === 'string' && data.body.length > 1000) {\n  // Detecta WebP (figurinha) - começa com UklGR (RIFF em base64)\n  if (data.body.startsWith('UklGR')) {\n    isMediaDetected = true;\n    mimetypeDetected = 'image/webp';\n    // Verifica se é WebP animado procurando por 'ANIM' no base64\n    // WebP animado tem o chunk 'ANIM' que em base64 aparece como 'QU5JT'\n    if (data.body.includes('QU5JT')) {\n      typeDetected = 'sticker-animated';\n    } else {\n      typeDetected = 'sticker';\n    }\n  }\n  // Detecta áudio OGG (WhatsApp usa OGG Opus para áudios)\n  else if (data.body.startsWith('T2dnUw') || data.body.startsWith('//')  || data.body.startsWith('SUQz')) {\n    isMediaDetected = true;\n    mimetypeDetected = 'audio/ogg; codecs=opus';\n    typeDetected = 'ptt'; // Push to talk (áudio de voz)\n  }\n  // Detecta imagem JPEG\n  else if (data.body.startsWith('/9j/') || data.body.startsWith('iVBORw')) {\n    isMediaDetected = true;\n    mimetypeDetected = data.body.startsWith('/9j/') ? 'image/jpeg' : 'image/png';\n    typeDetected = 'image';\n  }\n  // Detecta vídeo MP4\n  else if (data.body.startsWith('AAAAIGZ0eXBpc29t') || data.body.startsWith('AAAAGGZ0eXBtcDQy')) {\n    isMediaDetected = true;\n    mimetypeDetected = 'video/mp4';\n    typeDetected = 'video';\n  }\n  // Detecta PDF\n  else if (data.body.startsWith('JVBERi0')) {\n    isMediaDetected = true;\n    mimetypeDetected = 'application/pdf';\n    typeDetected = 'document';\n  }\n  // Qualquer outro base64 muito grande provavelmente é mídia\n  else if (!data.body.includes(' ') && data.body.length > 5000) {\n    isMediaDetected = true;\n    mimetypeDetected = 'application/octet-stream';\n    typeDetected = 'document';\n  }\n}\n\n// Detecta se é uma citação com comando /citar\nlet isCitarCommand = false;\nif (data.quotedMsg && data.body && typeof data.body === 'string') {\n  isCitarCommand = data.body.trim().toLowerCase().startsWith('/citar');\n}\n\nreturn [{\n  json: {\n    event: data.event,\n    isGroupMsg: data.isGroupMsg,\n    from: data.from,\n    body: data.body,\n    quotedMsg: data.quotedMsg,\n    quotedMsgId: data.quotedMsg?.id || null,\n    isCitarCommand: isCitarCommand,\n    isMedia: isMediaDetected,\n    mimetype: mimetypeDetected,\n    caption: data.caption || null,\n    filename: data.filename || null,\n    type: typeDetected,\n    // Campos adicionais para encaminhamento/URL\n    id: data.id || null,\n    messageId: data.messageId || data.id || null,\n    deprecatedMms3Url: data.deprecatedMms3Url || null,\n    clientUrl: data.clientUrl || null,\n    url: data.url || null,\n    // Toda a mensagem original para encaminhamento\n    originalMessage: data\n  }\n}];"
+			},
+			"name": "Extrai",
+			"type": "n8n-nodes-base.function",
+			"typeVersion": 1,
+			"position": [-656, 112]
+		},
+		{
+			"parameters": {
+				"functionCode": "// DEBUG: Mostra TODOS os dados recebidos\nconst data = $node[\"Extrai\"].json;\n\nconsole.log('=== DADOS COMPLETOS DO WEBHOOK ===');\nconsole.log(JSON.stringify(data.originalMessage, null, 2));\nconsole.log('==================================');\n\nreturn items;"
+			},
+			"name": "DEBUG - Ver Dados",
+			"type": "n8n-nodes-base.function",
+			"typeVersion": 1,
+			"position": [-520, 0]
+		},
+		{
+			"parameters": {
+				"conditions": {
+					"string": [
+						{
+							"value1": "={{$node[\"Extrai\"].json[\"event\"]}}",
+							"value2": "onmessage"
+						}
+					]
+				}
+			},
+			"name": "IF onmessage",
+			"type": "n8n-nodes-base.if",
+			"typeVersion": 1,
+			"position": [-448, 112]
+		},
+		{
+			"parameters": {
+				"conditions": {
+					"boolean": [
+						{
+							"value1": "={{$node[\"Extrai\"].json[\"isCitarCommand\"]}}"
+						}
+					]
+				}
+			},
+			"name": "IF Comando Citar",
+			"type": "n8n-nodes-base.if",
+			"typeVersion": 1,
+			"position": [-336, 112]
+		},
+		{
+			"parameters": {
+				"functionCode": "const data = $node[\"Extrai\"].json;\n\nconsole.log('=== PROCESSA CITAR ===');\nconsole.log('isCitarCommand:', data.isCitarCommand);\nconsole.log('isGroupMsg:', data.isGroupMsg);\nconsole.log('quotedMsg existe:', !!data.quotedMsg);\n\n// Processa comando /citar quando usado no grupo\nif (data.isCitarCommand && data.quotedMsg && data.isGroupMsg) {\n  console.log('Entrando no processamento /citar');\n  console.log('quotedMsg completa:', JSON.stringify(data.quotedMsg, null, 2));\n  \n  // Extrai o número do cliente da mensagem citada\n  let clientPhone = null;\n  let quotedOriginalId = null;\n\n  // PRIORIDADE 1: Tenta extrair o ID oculto da mensagem (se existir)\n  // Este ID foi inserido pelo nó \"Formata Grupo\" usando Zero Width Space\n  if (data.quotedMsg.body) {\n    const hiddenIdMatch = data.quotedMsg.body.match(/\\[ID:([^\\]]+)\\]/);\n    if (hiddenIdMatch) {\n      quotedOriginalId = hiddenIdMatch[1];\n      console.log('*** ID encontrado no texto oculto (body):', quotedOriginalId);\n    }\n  }\n  if (!quotedOriginalId && data.quotedMsg.caption) {\n    const hiddenIdMatch = data.quotedMsg.caption.match(/\\[ID:([^\\]]+)\\]/);\n    if (hiddenIdMatch) {\n      quotedOriginalId = hiddenIdMatch[1];\n      console.log('*** ID encontrado no caption oculto:', quotedOriginalId);\n    }\n  }\n  \n  // Procura no body da mensagem citada\n  if (data.quotedMsg.body) {\n    // Padrão 1: \"📱 Cliente: 5511999999999\"\n    let match = data.quotedMsg.body.match(/Cliente: (\\d+)/);\n    if (match) {\n      clientPhone = match[1] + '@c.us';\n      console.log('Cliente encontrado no body (padrão 1):', clientPhone);\n    }\n    \n    // Padrão 2: \"🎵 Áudio de: 5511999999999\"\n    if (!match) {\n      match = data.quotedMsg.body.match(/Áudio de: (\\d+)/);\n      if (match) {\n        clientPhone = match[1] + '@c.us';\n        console.log('Cliente encontrado no body (padrão 2):', clientPhone);\n      }\n    }\n    \n    // Padrão 3: \"🎨 Figurinha de: 5511999999999\"\n    if (!match) {\n      match = data.quotedMsg.body.match(/Figurinha de: (\\d+)/);\n      if (match) {\n        clientPhone = match[1] + '@c.us';\n        console.log('Cliente encontrado no body (padrão 3):', clientPhone);\n      }\n    }\n    \n    // Padrão 4: \"🎥 Vídeo de: 5511999999999\"\n    if (!match) {\n      match = data.quotedMsg.body.match(/Vídeo de: (\\d+)/);\n      if (match) {\n        clientPhone = match[1] + '@c.us';\n        console.log('Cliente encontrado no body (padrão 4):', clientPhone);\n      }\n    }\n  }\n  \n  // Procura no caption se for mídia\n  if (!clientPhone && data.quotedMsg.caption) {\n    const match = data.quotedMsg.caption.match(/Cliente: (\\d+)/);\n    if (match) {\n      clientPhone = match[1] + '@c.us';\n      console.log('Cliente encontrado no caption:', clientPhone);\n    }\n  }\n  \n  // BUSCA APRIMORADA DO ID DA MENSAGEM ORIGINAL\n  // Quando o atendente cita a mensagem do grupo que veio do cliente,\n  // a mensagem citada (quotedMsg) contém uma referência à mensagem original do cliente\n  \n  // Só busca em outras fontes se não encontrou no texto oculto\n  if (!quotedOriginalId) {\n    // Opção 1: quotedMsg.quotedMsg.id (a mensagem do grupo cita a mensagem original do cliente)\n    if (data.quotedMsg.quotedMsg && data.quotedMsg.quotedMsg.id) {\n      quotedOriginalId = data.quotedMsg.quotedMsg.id;\n      console.log('ID encontrado em quotedMsg.quotedMsg.id:', quotedOriginalId);\n    }\n    \n    // Opção 2: quotedMsg._data.quotedStanzaID ou quotedMsg._data.quotedParticipant\n    if (!quotedOriginalId && data.quotedMsg._data) {\n      if (data.quotedMsg._data.quotedStanzaID) {\n        quotedOriginalId = data.quotedMsg._data.quotedStanzaID;\n        console.log('ID encontrado em quotedMsg._data.quotedStanzaID:', quotedOriginalId);\n      } else if (data.quotedMsg._data.quotedMsg && data.quotedMsg._data.quotedMsg.id) {\n        quotedOriginalId = data.quotedMsg._data.quotedMsg.id;\n        console.log('ID encontrado em quotedMsg._data.quotedMsg.id:', quotedOriginalId);\n      } else if (data.quotedMsg._data.id && data.quotedMsg._data.id.id) {\n        quotedOriginalId = data.quotedMsg._data.id.id;\n        console.log('ID encontrado em quotedMsg._data.id.id:', quotedOriginalId);\n      }\n    }\n    \n    // Opção 3: quotedMsg.id (estrutura mais simples)\n    if (!quotedOriginalId && data.quotedMsg.id) {\n      // Verifica se é um objeto com propriedade id ou se já é uma string\n      if (typeof data.quotedMsg.id === 'object' && data.quotedMsg.id.id) {\n        quotedOriginalId = data.quotedMsg.id.id;\n        console.log('ID encontrado em quotedMsg.id.id:', quotedOriginalId);\n      } else if (typeof data.quotedMsg.id === 'string') {\n        quotedOriginalId = data.quotedMsg.id;\n        console.log('ID encontrado em quotedMsg.id:', quotedOriginalId);\n      }\n    }\n    \n    // Opção 4: Busca em originalMessage (estrutura completa)\n    if (!quotedOriginalId && data.originalMessage && data.originalMessage.quotedMsg) {\n      const origQuoted = data.originalMessage.quotedMsg;\n      if (origQuoted.quotedMsg && origQuoted.quotedMsg.id) {\n        quotedOriginalId = origQuoted.quotedMsg.id;\n        console.log('ID encontrado em originalMessage.quotedMsg.quotedMsg.id:', quotedOriginalId);\n      }\n    }\n  }\n  \n  console.log('Cliente extraído:', clientPhone);\n  console.log('ID final da mensagem original:', quotedOriginalId);\n  \n  if (clientPhone && quotedOriginalId) {\n    // Remove o comando /citar da mensagem\n    let messageText = data.body.trim();\n    messageText = messageText.replace(/^\\/citar\\s*/i, '');\n    \n    // Se não sobrar texto, não envia\n    if (!messageText) {\n      console.log('Mensagem vazia após remover /citar, não enviando');\n      return [];\n    }\n    \n    const payload = {\n      phone: clientPhone,\n      isGroup: false,\n      message: messageText,\n      messageId: quotedOriginalId,\n      _endpoint: 'send-reply'\n    };\n    \n    console.log('Payload final /citar:', JSON.stringify(payload, null, 2));\n    return [{ json: payload }];\n  } else {\n    console.log('ERRO: Não foi possível extrair cliente ou ID');\n    console.log('Cliente:', clientPhone);\n    console.log('ID:', quotedOriginalId);\n  }\n}\n\nconsole.log('Não é comando /citar ou condições não atendidas');\nreturn [];"
+			},
+			"name": "Processa Citar",
+			"type": "n8n-nodes-base.function",
+			"typeVersion": 1,
+			"position": [-160, 0]
+		},
+		{
+			"parameters": {
+				"conditions": {
+					"boolean": [
+						{
+							"value1": "={{$node[\"Extrai\"].json[\"isGroupMsg\"]}}"
+						}
+					]
+				}
+			},
+			"name": "IF Cliente",
+			"type": "n8n-nodes-base.if",
+			"typeVersion": 1,
+			"position": [-224, 112]
+		},
+		{
+			"parameters": {
+				"functionCode": "const data = $node[\"Extrai\"].json;\nconst clientPhone = data.from.split('@')[0];\nconst originalMessageId = data.messageId || data.id || null;\n\nconsole.log('=== FORMATA GRUPO ===');\nconsole.log('Cliente:', clientPhone);\nconsole.log('ID da mensagem original:', originalMessageId);\n\nconst payload = {\n  phone: \"YOUR_GROUP_ID@g.us\", // CONFIGURAR: ID do grupo WhatsApp para onde as mensagens dos clientes serão enviadas\n  isGroup: true\n};\n\nlet endpoint = 'send-message';\n\n// Cria um identificador oculto que contém o ID da mensagem original\n// Usamos um caractere invisível (Zero Width Space) para ocultar\nconst hiddenId = originalMessageId ? `\\u200B[ID:${originalMessageId}]\\u200B` : '';\n\n// Formata o número de telefone no padrão brasileiro\nconst formatPhone = (phone) => {\n  if (phone.length === 13 && phone.startsWith('55')) {\n    const ddd = phone.substr(2, 2);\n    const num1 = phone.substr(4, 5);\n    const num2 = phone.substr(9, 4);\n    return `+55 ${ddd} ${num1}-${num2}`;\n  }\n  return phone;\n};\n\n// Pega data e hora atual\nconst now = new Date();\nconst horario = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });\nconst dataCompleta = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });\n\n// Detecta tipo de mensagem\nconst getTipoMensagem = () => {\n  if (data.type === 'ptt' || data.mimetype?.startsWith('audio')) return 'Áudio';\n  if (data.type === 'sticker' || data.type === 'sticker-animated') return 'Figurinha';\n  if (data.mimetype?.startsWith('image')) return 'Imagem';\n  if (data.mimetype?.startsWith('video')) return 'Vídeo';\n  if (data.mimetype?.includes('pdf') || data.type === 'document') return 'Documento';\n  return 'Texto';\n};\n\n// Fluxo normal (sem comando /citar ou /citar sem cliente identificado)\nif (data.isMedia) {\n  const tipoMsg = getTipoMensagem();\n  let caption = `${hiddenId}━━━━━━━━━━━━━━━━━━━━━━━\\n📱 Cliente: ${formatPhone(clientPhone)}\\n🕐 Horário: ${horario}\\n📅 Data: ${dataCompleta}\\n💬 Tipo: ${tipoMsg}\\n━━━━━━━━━━━━━━━━━━━━━━━`;\n  \n  if (data.caption) {\n    caption += `\\n\\n${data.caption}`;\n  }\n  \n  const base64Clean = data.body;\n  \n  // ÁUDIO: marca para envio duplo\n  if (data.type === 'ptt' || data.mimetype?.startsWith('audio')) {\n    endpoint = 'send-voice-base64';\n    payload.base64Ptt = base64Clean;\n    payload._audioMode = true;\n    payload._textMessage = `${hiddenId}━━━━━━━━━━━━━━━━━━━━━━━\\n📱 Cliente: ${formatPhone(clientPhone)}\\n🕐 Horário: ${horario}\\n📅 Data: ${dataCompleta}\\n💬 Tipo: Áudio\\n━━━━━━━━━━━━━━━━━━━━━━━`;\n    payload._phone = payload.phone;\n  }\n  // FIGURINHA: marca para envio duplo\n  else if (data.type === 'sticker' || data.type === 'sticker-animated' || data.mimetype?.includes('webp')) {\n    // Usa endpoint diferente para figurinhas animadas\n    endpoint = data.type === 'sticker-animated' ? 'send-sticker-gif' : 'send-sticker';\n    // WPPConnect aceita path como base64 também\n    payload.path = `data:${data.mimetype || 'image/webp'};base64,${base64Clean}`;\n    payload._stickerMode = true;\n    payload._textMessage = `${hiddenId}━━━━━━━━━━━━━━━━━━━━━━━\\n📱 Cliente: ${formatPhone(clientPhone)}\\n🕐 Horário: ${horario}\\n📅 Data: ${dataCompleta}\\n💬 Tipo: Figurinha\\n━━━━━━━━━━━━━━━━━━━━━━━`;\n    payload._phone = payload.phone;\n  }\n  // IMAGEM (exceto WebP que já foi tratado como sticker)\n  else if (data.mimetype?.startsWith('image') && !data.mimetype?.includes('webp')) {\n    endpoint = 'send-image';\n    payload.base64 = `data:${data.mimetype};base64,${base64Clean}`;\n    payload.filename = data.mimetype.includes('png') ? 'image.png' : 'image.jpg';\n    payload.caption = caption;\n  }\n  // VÍDEO: similar ao fluxo de imagens\n  else if (data.mimetype?.startsWith('video')) {\n    endpoint = 'send-file-base64';\n    payload.base64 = `data:${data.mimetype};base64,${base64Clean}`;\n    payload.filename = 'video.mp4';\n    payload.caption = caption;\n    payload._videoMode = true;\n    payload._textMessage = `${hiddenId}━━━━━━━━━━━━━━━━━━━━━━━\\n📱 Cliente: ${formatPhone(clientPhone)}\\n🕐 Horário: ${horario}\\n📅 Data: ${dataCompleta}\\n💬 Tipo: Vídeo\\n━━━━━━━━━━━━━━━━━━━━━━━`;\n    payload._phone = payload.phone;\n  }\n  // DOCUMENTO\n  else {\n    endpoint = 'send-file-base64';\n    payload.base64 = base64Clean;\n    payload.filename = data.filename || 'file.pdf';\n    payload.caption = caption;\n  }\n} else {\n  const tipoMsg = getTipoMensagem();\n  payload.message = `${hiddenId}━━━━━━━━━━━━━━━━━━━━━━━\\n📱 Cliente: ${formatPhone(clientPhone)}\\n🕐 Horário: ${horario}\\n📅 Data: ${dataCompleta}\\n💬 Tipo: ${tipoMsg}\\n━━━━━━━━━━━━━━━━━━━━━━━\\n\\n${data.body || ''}`;\n}\n\nconsole.log('Payload formatado para grupo:', JSON.stringify({...payload, base64: '[BASE64]', base64Ptt: '[BASE64]'}, null, 2));\n\nreturn [{ json: { ...payload, _endpoint: endpoint } }];"
+			},
+			"name": "Formata Grupo",
+			"type": "n8n-nodes-base.function",
+			"typeVersion": 1,
+			"position": [-80, 0]
+		},
+		{
+			"parameters": {
+				"functionCode": "// Simplesmente passa tudo adiante sem modificar\nreturn [{\n  json: $json\n}];"
+			},
+			"name": "Prepara Request",
+			"type": "n8n-nodes-base.function",
+			"typeVersion": 1,
+			"position": [30, 0]
+		},
+		{
+			"parameters": {
+				"functionCode": "// Prepara URL dinâmica e corpo da requisição\nconst endpoint = $json._endpoint || 'send-message';\nconst audioMode = $json._audioMode || false;\nconst stickerMode = $json._stickerMode || false;\nconst videoMode = $json._videoMode || false;\nconst textMessage = $json._textMessage || '';\nconst phone = $json._phone;\n\n// Payload limpo (sem flags internas)\nconst payload = { ...$json };\ndelete payload._endpoint;\ndelete payload._audioMode;\ndelete payload._stickerMode;\ndelete payload._videoMode;\ndelete payload._textMessage;\ndelete payload._phone;\n\nreturn [{\n  json: {\n    _url: `YOUR_WPPCONNECT_URL/api/YOUR_SESSION_NAME/${endpoint}`, // CONFIGURAR: URL do servidor WPPConnect e nome da sessão\n    _payload: payload,\n    _audioMode: audioMode,\n    _stickerMode: stickerMode,\n    _videoMode: videoMode,\n    _textMessage: textMessage,\n    _phone: phone\n  }\n}];"
+			},
+			"name": "Monta URL",
+			"type": "n8n-nodes-base.function",
+			"typeVersion": 1,
+			"position": [120, 0]
+		},
+		{
+			"parameters": {
+				"requestMethod": "POST",
+				"url": "={{ $json._url }}",
+				"jsonParameters": true,
+				"options": {},
+				"bodyParametersJson": "={{ JSON.stringify($json._payload) }}",
+				"headerParametersJson": "{\n  \"Authorization\": \"Bearer YOUR_WPPCONNECT_API_KEY\",\n  \"Content-Type\": \"application/json\"\n}\n"
+			},
+			"name": "HTTP Grupo",
+			"notes": "CONFIGURAÇÃO NECESSÁRIA:\n- Authorization: Insira o Bearer token da API do WPPConnect\n- Obtenha o token nas configurações do servidor WPPConnect",
+			"type": "n8n-nodes-base.httpRequest",
+			"typeVersion": 1,
+			"position": [210, 0]
+		},
+		{
+			"parameters": {
+				"functionCode": "// Verifica se é áudio, figurinha ou vídeo usando as flags que foram passadas no Monta URL\nconst montaUrlData = $node[\"Monta URL\"].json;\nconst isAudio = montaUrlData._audioMode || false;\nconst isSticker = montaUrlData._stickerMode || false;\nconst isVideo = montaUrlData._videoMode || false;\n\nreturn [{\n  json: {\n    isAudio: isAudio,\n    isSticker: isSticker,\n    isVideo: isVideo,\n    needsIdentification: isAudio || isSticker || isVideo,\n    textMessage: montaUrlData._textMessage || '',\n    phone: montaUrlData._phone || ''\n  }\n}];"
+			},
+			"name": "DEBUG Media Check",
+			"type": "n8n-nodes-base.function",
+			"typeVersion": 1,
+			"position": [310, 0]
+		},
+		{
+			"parameters": {
+				"conditions": {
+					"string": [
+						{
+							"value1": "={{String($json.needsIdentification)}}",
+							"value2": "true"
+						}
+					]
+				}
+			},
+			"name": "IF Audio/Sticker/Video",
+			"type": "n8n-nodes-base.if",
+			"typeVersion": 1,
+			"position": [410, 0]
+		},
+		{
+			"parameters": {
+				"requestMethod": "POST",
+				"url": "YOUR_WPPCONNECT_URL/api/YOUR_SESSION_NAME/send-message",
+				"jsonParameters": true,
+				"options": {},
+				"bodyParametersJson": "={{JSON.stringify({\n  phone: $json.phone,\n  isGroup: true,\n  message: $json.textMessage\n})}}",
+				"headerParametersJson": "{\n  \"Authorization\": \"Bearer YOUR_WPPCONNECT_API_KEY\",\n  \"Content-Type\": \"application/json\"\n}\n"
+			},
+			"name": "Envia Identificação",
+			"notes": "CONFIGURAÇÃO NECESSÁRIA:\n- url: Configure a URL do servidor WPPConnect e nome da sessão\n- Authorization: Insira o Bearer token da API do WPPConnect",
+			"type": "n8n-nodes-base.httpRequest",
+			"typeVersion": 1,
+			"position": [580, -80]
+		},
+		{
+			"parameters": {
+				"functionCode": "const data = $node[\"Extrai\"].json;\n\n// DEBUG: Log completo da quotedMsg\nconsole.log('=== DEBUG EXTRAI CLIENTE ===');\nconsole.log('isCitarCommand:', data.isCitarCommand);\nconsole.log('quotedMsg completa:', JSON.stringify(data.quotedMsg, null, 2));\nconsole.log('============================');\n\n// Verifica se é uma resposta (quotedMsg) do grupo\nif (data.quotedMsg) {\n  // Tenta extrair o número do cliente da mensagem citada\n  let clientPhone = null;\n  let quotedOriginalId = null;\n  \n  // Procura no body da mensagem citada (texto, áudio ou figurinha)\n  if (data.quotedMsg.body) {\n    // Padrão 1: \"📱 Cliente: 5511999999999\"\n    let match = data.quotedMsg.body.match(/Cliente: (\\d+)/);\n    if (match) {\n      clientPhone = match[1] + '@c.us';\n    }\n    \n    // Padrão 2: \"🎵 Áudio de: 5511999999999\"\n    if (!match) {\n      match = data.quotedMsg.body.match(/Áudio de: (\\d+)/);\n      if (match) {\n        clientPhone = match[1] + '@c.us';\n      }\n    }\n    \n    // Padrão 3: \"🎨 Figurinha de: 5511999999999\"\n    if (!match) {\n      match = data.quotedMsg.body.match(/Figurinha de: (\\d+)/);\n      if (match) {\n        clientPhone = match[1] + '@c.us';\n      }\n    }\n    \n    // Padrão 4: \"🎥 Vídeo de: 5511999999999\"\n    if (!match) {\n      match = data.quotedMsg.body.match(/Vídeo de: (\\d+)/);\n      if (match) {\n        clientPhone = match[1] + '@c.us';\n      }\n    }\n    \n    // Padrão 5: \"⬆️ Responda aqui\" - pega do áudio/figurinha/vídeo anterior\n    if (!match && data.quotedMsg.body.includes('Responda aqui')) {\n      // Neste caso, precisa pegar o número da mensagem que veio antes\n      // Como não temos essa info, vamos ignorar por enquanto\n      // O atendente precisa citar a mensagem de texto ou imagem que tem o número\n    }\n  }\n  \n  // Procura no caption se for mídia\n  if (!clientPhone && data.quotedMsg.caption) {\n    const match = data.quotedMsg.caption.match(/Cliente: (\\d+)/);\n    if (match) {\n      clientPhone = match[1] + '@c.us';\n    }\n  }\n  \n  // Tenta extrair o ID da mensagem original do cliente de várias formas\n  // Opção 1: quotedMsg.quotedMsg.id (mensagem citada pela mensagem do grupo)\n  if (data.quotedMsg.quotedMsg && data.quotedMsg.quotedMsg.id) {\n    quotedOriginalId = data.quotedMsg.quotedMsg.id;\n    console.log('ID encontrado em quotedMsg.quotedMsg.id:', quotedOriginalId);\n  }\n  // Opção 2: quotedMsg.id (ID da própria mensagem citada)\n  else if (data.quotedMsg.id) {\n    quotedOriginalId = data.quotedMsg.id;\n    console.log('ID encontrado em quotedMsg.id:', quotedOriginalId);\n  }\n  // Opção 3: Busca em quotedMsg._data (estrutura interna do WPPConnect)\n  else if (data.quotedMsg._data && data.quotedMsg._data.id) {\n    quotedOriginalId = data.quotedMsg._data.id;\n    console.log('ID encontrado em quotedMsg._data.id:', quotedOriginalId);\n  }\n  \n  console.log('Cliente extraído:', clientPhone);\n  console.log('ID da mensagem original:', quotedOriginalId);\n  \n  if (clientPhone) {\n    const payload = {\n      clientPhone: clientPhone\n    };\n    \n    // Se for comando /citar E tiver o ID da mensagem original, marca para usar send-reply\n    if (data.isCitarCommand && quotedOriginalId) {\n      payload.isCitarCommand = true;\n      payload.quotedOriginalId = quotedOriginalId;\n      \n      // Remove o comando /citar da mensagem\n      let messageText = data.body.trim();\n      messageText = messageText.replace(/^\\/citar\\s*/i, '');\n      \n      // Se não sobrar texto, usa mensagem vazia (só cita)\n      payload.message = messageText || '';\n      payload.isMedia = false;\n      \n      console.log('Payload para /citar:', JSON.stringify(payload, null, 2));\n    }\n    // Fluxo normal (sem /citar)\n    else {\n      // Verifica se a resposta contém mídia\n      if (data.isMedia) {\n        payload.base64 = data.body;\n        payload.mimetype = data.mimetype;\n        payload.isMedia = true;\n        payload.type = data.type;\n        \n        if (data.caption) {\n          payload.caption = data.caption;\n        }\n        if (data.filename) {\n          payload.filename = data.filename;\n        }\n      } else {\n        // É texto simples\n        payload.message = data.body;\n        payload.isMedia = false;\n      }\n    }\n    \n    return [{ json: payload }];\n  }\n}\n\nreturn [];"
+			},
+			"name": "Extrai Cliente",
+			"type": "n8n-nodes-base.function",
+			"typeVersion": 1,
+			"position": [-80, 208]
+		},
+		{
+			"parameters": {
+				"functionCode": "const data = $json;\n\nconst payload = {\n  phone: data.clientPhone,\n  isGroup: false\n};\n\nlet endpoint = 'send-message';\n\n// Se for comando /citar, usa send-reply\nif (data.isCitarCommand && data.quotedOriginalId) {\n  endpoint = 'send-reply';\n  payload.message = data.message;\n  payload.messageId = data.quotedOriginalId;\n  \n  return [{ json: { ...payload, _endpoint: endpoint } }];\n}\n\n// Fluxo normal (sem /citar)\n// Verifica se é mídia ou texto\nif (data.isMedia) {\n  const base64Clean = data.base64;\n  \n  // ÁUDIO\n  if (data.type === 'ptt' || data.mimetype?.startsWith('audio')) {\n    endpoint = 'send-voice-base64';\n    payload.base64Ptt = base64Clean;\n  }\n  // FIGURINHA\n  else if (data.type === 'sticker' || data.type === 'sticker-animated' || data.mimetype?.includes('webp')) {\n    endpoint = data.type === 'sticker-animated' ? 'send-sticker-gif' : 'send-sticker';\n    payload.path = `data:${data.mimetype || 'image/webp'};base64,${base64Clean}`;\n  }\n  // IMAGEM\n  else if (data.mimetype?.startsWith('image') && !data.mimetype?.includes('webp')) {\n    endpoint = 'send-image';\n    payload.base64 = `data:${data.mimetype};base64,${base64Clean}`;\n    payload.filename = data.mimetype.includes('png') ? 'image.png' : 'image.jpg';\n    if (data.caption) {\n      payload.caption = data.caption;\n    }\n  }\n  // VÍDEO: similar ao fluxo de imagens\n  else if (data.mimetype?.startsWith('video')) {\n    endpoint = 'send-file-base64';\n    payload.base64 = `data:${data.mimetype};base64,${base64Clean}`;\n    payload.filename = 'video.mp4';\n    if (data.caption) {\n      payload.caption = data.caption;\n    }\n  }\n  // DOCUMENTO\n  else {\n    endpoint = 'send-file-base64';\n    payload.base64 = base64Clean;\n    payload.filename = data.filename || 'file.pdf';\n    if (data.caption) {\n      payload.caption = data.caption;\n    }\n  }\n} else {\n  payload.message = data.message;\n}\n\nreturn [{ json: { ...payload, _endpoint: endpoint } }];"
+			},
+			"name": "Formata Cliente",
+			"type": "n8n-nodes-base.function",
+			"typeVersion": 1,
+			"position": [144, 208]
+		},
+		{
+			"parameters": {
+				"functionCode": "// Prepara URL e payload para HTTP Cliente\nconst endpoint = $json._endpoint || 'send-message';\nconst payload = { ...$json };\ndelete payload._endpoint;\n\nreturn [{\n  json: {\n    _url: `YOUR_WPPCONNECT_URL/api/YOUR_SESSION_NAME/${endpoint}`, // CONFIGURAR: URL do servidor WPPConnect e nome da sessão\n    _payload: JSON.stringify(payload)\n  }\n}];"
+			},
+			"name": "Prepara HTTP Cliente",
+			"type": "n8n-nodes-base.function",
+			"typeVersion": 1,
+			"position": [256, 208]
+		},
+		{
+			"parameters": {
+				"requestMethod": "POST",
+				"url": "={{$json._url}}",
+				"jsonParameters": true,
+				"options": {},
+				"bodyParametersJson": "={{$json._payload}}",
+				"headerParametersJson": "{\n  \"Authorization\": \"Bearer YOUR_WPPCONNECT_API_KEY\",\n  \"Content-Type\": \"application/json\"\n}\n"
+			},
+			"name": "HTTP Cliente",
+			"notes": "CONFIGURAÇÃO NECESSÁRIA:\n- Authorization: Insira o Bearer token da API do WPPConnect\n- Obtenha o token nas configurações do servidor WPPConnect",
+			"type": "n8n-nodes-base.httpRequest",
+			"typeVersion": 1,
+			"position": [480, 208]
+		},
+		{
+			"parameters": {
+				"respondWith": "json",
+				"responseBody": "={\"ok\": true}",
+				"options": {}
+			},
+			"name": "Response",
+			"type": "n8n-nodes-base.respondToWebhook",
+			"typeVersion": 1,
+			"position": [448, 112]
+		}
+	],
+	"pinData": {},
+	"connections": {
+		"Webhook": {
+			"main": [
+				[
+					{
+						"node": "Extrai",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Extrai": {
+			"main": [
+				[
+					{
+						"node": "DEBUG - Ver Dados",
+						"type": "main",
+						"index": 0
+					},
+					{
+						"node": "IF onmessage",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"IF onmessage": {
+			"main": [
+				[
+					{
+						"node": "IF Comando Citar",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"IF Comando Citar": {
+			"main": [
+				[
+					{
+						"node": "IF Cliente",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Processa Citar",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Processa Citar": {
+			"main": [
+				[
+					{
+						"node": "Prepara HTTP Cliente",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"IF Cliente": {
+			"main": [
+				[
+					{
+						"node": "Formata Grupo",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Extrai Cliente",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Formata Grupo": {
+			"main": [
+				[
+					{
+						"node": "Monta URL",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Monta URL": {
+			"main": [
+				[
+					{
+						"node": "HTTP Grupo",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"HTTP Grupo": {
+			"main": [
+				[
+					{
+						"node": "DEBUG Media Check",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"DEBUG Media Check": {
+			"main": [
+				[
+					{
+						"node": "IF Audio/Sticker/Video",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"IF Audio/Sticker/Video": {
+			"main": [
+				[
+					{
+						"node": "Envia Identificação",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Response",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Envia Identificação": {
+			"main": [
+				[
+					{
+						"node": "Response",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Extrai Cliente": {
+			"main": [
+				[
+					{
+						"node": "Formata Cliente",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Formata Cliente": {
+			"main": [
+				[
+					{
+						"node": "Prepara HTTP Cliente",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Prepara HTTP Cliente": {
+			"main": [
+				[
+					{
+						"node": "HTTP Cliente",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"HTTP Cliente": {
+			"main": [
+				[
+					{
+						"node": "Response",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		}
+	},
+	"active": true,
+	"settings": {
+		"executionOrder": "v1"
+	},
+	"meta": {},
+	"tags": []
+}
