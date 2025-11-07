@@ -21,7 +21,7 @@
 			"name": "Extrai",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [-656, 112],
+			"position": [-656, 112]
 		},
 		{
 			"parameters": {
@@ -30,7 +30,7 @@
 			"name": "DEBUG - Ver Dados",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [-520, 0],
+			"position": [-520, 0]
 		},
 		{
 			"parameters": {
@@ -46,7 +46,7 @@
 			"name": "IF onmessage",
 			"type": "n8n-nodes-base.if",
 			"typeVersion": 1,
-			"position": [-448, 112],
+			"position": [-448, 112]
 		},
 		{
 			"parameters": {
@@ -61,7 +61,7 @@
 			"name": "IF Comando Citar",
 			"type": "n8n-nodes-base.if",
 			"typeVersion": 1,
-			"position": [-336, 112],
+			"position": [-336, 112]
 		},
 		{
 			"parameters": {
@@ -70,7 +70,7 @@
 			"name": "Processa Citar",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [-160, 0],
+			"position": [-160, 0]
 		},
 		{
 			"parameters": {
@@ -85,7 +85,7 @@
 			"name": "IF Cliente",
 			"type": "n8n-nodes-base.if",
 			"typeVersion": 1,
-			"position": [-224, 112],
+			"position": [-224, 112]
 		},
 		{
 			"parameters": {
@@ -94,7 +94,7 @@
 			"name": "Formata Grupo",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [-80, 0],
+			"position": [-80, 0]
 		},
 		{
 			"parameters": {
@@ -103,7 +103,7 @@
 			"name": "Prepara Request",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [30, 0],
+			"position": [30, 0]
 		},
 		{
 			"parameters": {
@@ -112,7 +112,7 @@
 			"name": "Monta URL",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [120, 0],
+			"position": [120, 0]
 		},
 		{
 			"parameters": {
@@ -126,7 +126,7 @@
 			"name": "HTTP Grupo",
 			"type": "n8n-nodes-base.httpRequest",
 			"typeVersion": 1,
-			"position": [210, 0],
+			"position": [210, 0]
 		},
 		{
 			"parameters": {
@@ -135,7 +135,7 @@
 			"name": "DEBUG Media Check",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [310, 0],
+			"position": [310, 0]
 		},
 		{
 			"parameters": {
@@ -151,7 +151,7 @@
 			"name": "IF Audio/Sticker/Video",
 			"type": "n8n-nodes-base.if",
 			"typeVersion": 1,
-			"position": [410, 0],
+			"position": [410, 0]
 		},
 		{
 			"parameters": {
@@ -165,7 +165,7 @@
 			"name": "Envia Identificação",
 			"type": "n8n-nodes-base.httpRequest",
 			"typeVersion": 1,
-			"position": [580, -80],
+			"position": [580, -80]
 		},
 		{
 			"parameters": {
@@ -174,7 +174,7 @@
 			"name": "Extrai Cliente",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [-80, 208],
+			"position": [-80, 208]
 		},
 		{
 			"parameters": {
@@ -183,7 +183,7 @@
 			"name": "Formata Cliente",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [144, 208],
+			"position": [144, 208]
 		},
 		{
 			"parameters": {
@@ -192,7 +192,7 @@
 			"name": "Prepara HTTP Cliente",
 			"type": "n8n-nodes-base.function",
 			"typeVersion": 1,
-			"position": [256, 208],
+			"position": [256, 208]
 		},
 		{
 			"parameters": {
@@ -206,7 +206,7 @@
 			"name": "HTTP Cliente",
 			"type": "n8n-nodes-base.httpRequest",
 			"typeVersion": 1,
-			"position": [480, 208],
+			"position": [480, 208]
 		},
 		{
 			"parameters": {
@@ -217,7 +217,7 @@
 			"name": "Response",
 			"type": "n8n-nodes-base.respondToWebhook",
 			"typeVersion": 1,
-			"position": [448, 112],
+			"position": [448, 112]
 		}
 	],
 	"pinData": {},
@@ -429,7 +429,6 @@
 	"settings": {
 		"executionOrder": "v1"
 	},
-	"meta": {
-	},
+	"meta": {},
 	"tags": []
 }
