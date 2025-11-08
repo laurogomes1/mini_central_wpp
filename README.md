@@ -378,9 +378,9 @@ MIT License - veja [LICENSE](LICENSE) para detalhes.
 
 Desenvolvido por **[Seu Nome]**
 
-- GitHub: [@seu-usuario](https://github.com/seu-usuario)
-- LinkedIn: [/in/seu-perfil](https://linkedin.com/in/seu-perfil)
-- Email: seu@email.com
+- GitHub: [@seu-usuario](https://github.com/laurogomes1)
+- LinkedIn: [/in/seu-perfil]((https://www.linkedin.com/in/lauro-gomes-537273b1/))
+- Email: lauro.silva@1clickmkt.com.br
 
 ---
 
