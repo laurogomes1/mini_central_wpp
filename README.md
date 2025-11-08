@@ -376,7 +376,7 @@ MIT License - veja [LICENSE](LICENSE) para detalhes.
 
 ## Autor
 
-Desenvolvido por **[Seu Nome]**
+Desenvolvido por **[Lauro Gomes]**
 
 - GitHub: [@laurogomes1](https://github.com/laurogomes1)
 - LinkedIn: [/in/lauro-gomes-537273b1]((https://www.linkedin.com/in/lauro-gomes-537273b1/))
